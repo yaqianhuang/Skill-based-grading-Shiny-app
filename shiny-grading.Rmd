@@ -1,0 +1,241 @@
+---
+title: "Shiny app to track skills-based grading"
+output: ioslides_presentation
+author: "Yaqian Huang"
+date: "2023-06-05"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+## What is Shiny?
+
+An R package that can be used to build web-based apps straight from R.
+
+<br>
+It requires an installation of R packages, and internet to work:
+
+```{r, echo=T, eval=F}
+install.packages("shiny")
+library(shiny)
+```
+
+## A Hello Shiny example
+
+```{r, echo=T,eval=F}
+library(shiny)
+runExample("01_hello")
+```
+
+<div class="centered">
+<img src="https://shiny.posit.co/r/getstarted/shiny-basics/lesson1/images/01_hello.png" alt="example app" width="600" height="300">
+</div>
+
+<!-- ![example-app](https://shiny.posit.co/r/getstarted/shiny-basics/lesson1/images/01_hello.png){width: 400px;height: 300px} -->
+
+## Why Shiny?
+
+- Interactive visuals that show data summaries, and enable users to explore data
+- Real-time updates and reactive programming
+- Easy web development
+- Convenient and straightforward for R users (e.g., `tidyverse`, `ggplot2`)
+
+
+## Basic Shiny app architecture
+
+Create a single `app.R` script:
+
+This script contains
+
+* a user interface object - what to display
+
+```{r, echo=T,eval=F}
+ui <- basicPage("This is a Shiny app")
+```
+
+* a server function - outputs to be used in the UI
+
+```{r, echo=T,eval=F}
+server <- function(input, output, session) { }
+```
+
+* a call to the `shinyApp` function - launch the app
+
+```{r, echo=T,eval=F}
+shinyApp(ui = ui, server = server)
+```
+
+## Simple app
+![](/Users/Yaqian/Study/UCLA/Workshop/min-shiny.png)
+
+## UI
+
+A common design - everything is on one single page:
+
+```{r, echo=T, eval=F}
+ui <- fluidPage(
+  titlePanel("title panel"),
+  sidebarLayout(
+    sidebarPanel("sidebar panel"),
+    mainPanel("main panel")
+  )
+```
+
+<div class="centered">
+<img src="/Users/Yaqian/Study/UCLA/Workshop/sidebar-layout1.png" alt="layout" width="600" height="300">
+</div>
+
+## UI cont.
+
+If you want tabs on separate pages:
+
+```{r, echo=T, eval=F}
+ui <- navbarPage(
+  "title",
+  intro_tab,
+  second_tab,
+  third_tab
+)
+```
+
+Note slightly different components inside. My app uses this.
+
+## UI cont.
+
+<div class="centered">
+<img src="/Users/Yaqian/Study/UCLA/Workshop/basic-widgets.png" alt="widgets" width="800" height="500">
+</div>
+
+## How to add a plot
+
+Add in both `ui` and `server`:
+
+```{r, echo=T, eval=F}
+ui <- fluidPage(
+  sidebarLayout(
+    mainPanel(
+    plotOutput(outputId = "scatterPlot")
+)))
+```
+
+
+```{r, echo=T, eval=F}
+server <- function(input, output) {
+    output$scatterPlot <- renderPlot({
+      ggplot()}
+)}
+```
+
+Note the matching name "scatterPlot".
+
+## How to add a control {.smaller}
+
+```{r, echo=T, eval=F}
+ui <- fluidPage(
+  sidebarLayout(
+    sidebarPanel(
+    selectInput(inputId = "skills",
+              label = "Select a skill",
+              # Create the choices that can be selected. 
+              # e.g. Display "A" and link to value "a"
+              choices = c("1.1 DefineSymbol"="1.1.",
+                          "1.2 GiveSymbol"="1.2.",
+                          ...), 
+              selected = "NA", # from the set of choice values
+              ))))
+```
+
+You need to somehow use this `inputID` in the `server`, for example, I subset the data according to the particular skill chosen. Because we do not want students to see other students, and also they can just go to the particular skill they want to check.
+
+```{r, echo=T, eval=F}
+server <- function(input, output) {
+    output$scatterPlot <- renderPlot({
+      ggplot(data = df%>%filter(skillnum%in%input$skills)})}
+```
+
+## Organization
+
+I prefer to define each component (`sidebarPanel`, `mainPanel`,) first, and then organize them hierarchically in the corresponding position, e.g., `sidebarLayout`, `tabPanel`, etc.
+
+## Deployment
+
+Now everything is ready, how do I launch it?
+
+The easiest way may be installing `rsconnect` package:
+
+```{r, echo=T, eval=F}
+install.packages("rsconnect")
+library(rsconnect)
+```
+
+When you first try to deploy, it will ask you for your account info on [shinyapps.io](https://shinyapps.io).
+
+<div class='centered'>
+*The p-lab has a paid account:
+<b>plab.ucla\@gmail.com</b>*
+</div>
+
+When you run the app, there is a "Publish" button.
+
+More info about getting your app online here:
+https://docs.posit.co/shinyapps.io/getting-started.html
+
+
+## Skills-based grading {.smaller}
+
+A large part of students' performance is evaluated based on skills mastery. Knowing where students are towards mastering a skill is as helpful for them and as useful for you.
+
+Challenges:
+
+- The Canvas system is rather opaque in setting up individual progress for a particular skill. 
+
+- The number of skills may vary from course to course.
+
+- A lot of work to enter and update grades on a regular basis (e.g., weekly) - typically done by TAs.
+
+Still, students are constantly emailing you for various grade-related things, e.g., whether their grades are updated, and how they should improve based on that, etc.
+
+It would be great if  students can track the scores on their own any time, and decide which quizzes to take for the current week, and also get to know how everyone else is doing.
+
+
+## An app designed for 103 in Winter 2023
+
+Try playing around with this app:
+
+https://plabucla.shinyapps.io/103skillgrading/
+
+
+## R script with de-identified dataset
+
+Step by step unpack in R
+
+## Catering
+
+Shiny apps do not fix all the grading concerns. It just saves some labor and allows flexibility on both sides.
+
+A couple of things need to be done to use the app smoothly.
+
+1. Edit the number of skills and their names for each different course and keep them consistent wherever they occur in the R script
+2. Generate random student IDs to avoid peeking
+3. Update the csv sheet every time
+4. Change to whatever plot style you feel up to
+
+
+## Further reading
+
+- The [official tutorial](https://shiny.posit.co/r/getstarted/shiny-basics/lesson1/index.html) by R Studio
+- Many R Shiny books:
+  - [Mastering Shiny](https://mastering-shiny.org/) by Hadley Wickham
+  - [Interactive web-based data visualization with R, plotly, and shiny](https://plotly-r.com/) by Carson Sievert
+- [Shiny Gallery](https://shiny.posit.co/r/gallery/) on R Studio
+- [Shiny cheat sheet](https://shiny.posit.co/r/articles/start/cheatsheet/) Many options depending on your purpose
+
+
+## Credits
+
+Laderas et al. (2018). [a gRadual intRoduction to Shiny](https://laderast.github.io/gradual_shiny/).
+
+R Studio Tutorial: https://shiny.posit.co/r/getstarted/shiny-basics/lesson1/index.html
+
+Xie et al. (2023). Chapter 4.1 IOSslides presentation in [*R Markdown: The Definitive Guide*]  (https://bookdown.org/yihui/rmarkdown/ioslides-presentation.html)
