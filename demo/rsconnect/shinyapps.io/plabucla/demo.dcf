@@ -1,0 +1,14 @@
+name: demo
+title: demo
+username:
+account: plabucla
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 9274647
+bundleId: 7322794
+url: https://plabucla.shinyapps.io/demo/
+when: 1686268199.40218
+lastSyncTime: 1686268199.4022
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: Guide

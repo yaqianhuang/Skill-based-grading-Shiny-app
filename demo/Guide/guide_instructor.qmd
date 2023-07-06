@@ -1,0 +1,374 @@
+---
+title: "Shiny Guide for Instructors using Skills-Based Grading"
+author: "Yaqian Huang"
+date: "6/9/2023"
+# output:
+#   html_notebook:
+#   toc: true
+format:
+  html:
+    toc: true
+editor: visual
+---
+
+## BruinLearn setup
+
+The most tedious work is to create multiple quizzes for each week, because each quiz needs to be tagged by a particular skill.
+
+Quizzes are associated with question banks, as is the case with LING 102/103.
+
+In BruinLearn, you will go to *Quizzes -\> +Quiz*
+
+In the new *Unnamed Quiz* window, change the name of the Quiz to be **QuizX-SkillName**
+
+**SkillName = Skill number + Skill name**
+
+For example, **1.1.DefineSymbol = 1.1.** + **DefineSymbol**
+
+Then the name of the first quiz tagged with skill 1.1 will be, **Quiz1-1.1.DefineSymbol**
+
+It is best if you do not have any spaces in your quiz names. If you do, you need to watch out for the column names after R read it in, because R will fill in any spaces/blanks with dots.
+
+## Download R and RStudio
+
+Follow the instructions on this webpage: <https://posit.co/download/rstudio-desktop/>
+
+Make sure you have installed both R and RStudio.
+
+## Install Shiny dependencies
+
+Open up RStudio, type in the Console:
+
+```{r, eval=F}
+install.packages(c("shiny","rsconnect","tidyverse","ggplot2","reshape2"))
+```
+
+## Prepare csv files
+
+You will need:
+
+1.  csv exported from BruinLearn with all the grades (update weekly)
+
+-   Go to your course page on BruinLearn
+
+-   Click on *Grades*, on that page, Click on *Actions -\> Export Current Gradebook View*
+
+-   You should update this weekly, or based on whatever interval you want to update the app and the grades
+
+2.  `skills.csv` which has skills and \# of times of mastery
+
+-   Prepare a csv which contains two columns: *skills (number + name)*; *\# times of mastery*
+
+3.  `studentIDs.csv` which has student keys matching their names in an alphabetical order
+
+-   Prepare a csv which contains two columns: *Student names* (in an alphabetical order) and *their random Keys* that they use to locate their grades and remain confidential
+
+Prepare your csv using the template files provided in this folder, change only the contents, DO NOT change the column names of `skills.csv`and `studentIDs.csv`.
+
+## Data preparation part
+
+Open up the `app.R` script in RStudio. If you have installed R and RStudio, double click on the script should open up RStudio automatically.
+
+#### Load the first csv file with grades.
+
+Extract its name, and replace the sample file with the FILENAME of your file:
+
+```{r, eval=FALSE}
+# the template:
+data <- read.csv('ng-2023-03-16T1433_Grades-23W-LING-103-LEC-1.csv')
+
+# Replace:
+data <- read.csv('FILENAME.csv')
+```
+
+#### Filter students who are enrolled.
+
+Typically, they should be in a Discussion Section. For example, LING 103 has four sections, so by only selecting the four sections, I only select the enrolled students.
+
+You should change the section names according to your course in the script.
+
+```{r, eval=FALSE}
+# the template:
+data <- data%>%filter(Section %in% c('23W-LING-103-DIS-1A','23W-LING-103-DIS-1B',
+                                     '23W-LING-103-DIS-1C','23W-LING-103-DIS-1D'))
+
+# check which sections are in your course:
+unique(data$Section)
+
+# Replace:
+data <- data%>%filter(Section %in% c('section1','section2',
+                                     'section3','...'))
+
+```
+
+#### Load the second csv file.
+
+Inspect the `skills.csv` template. Modify based on the skills and \# times of mastery for your own course.
+
+**NOTE**: you need to have the **.** after the skill number, so **1.1.**, not 1.1
+
+**Be consistent with how you enter the skill in the quiz name on BruinLearn!**
+
+Run the following lines in the script to double check:
+
+```{r, eval=F}
+skills <- read.csv('skills.csv')
+skills$skill # check this
+```
+
+#### Load the third csv file.
+
+Inspect the `studentIDs.csv` template. Modify based on the students in your class, and the random keys you generated for them. There are many ways to generate random names or words online.
+
+**NOTE**: The student names and format in the `Student` column in this csv should be **the same as** the first column `Student` in your first csv from BruinLearn with grades.
+
+Run the following lines to double check:
+
+```{r, eval=F}
+student_key <- read.csv('studentIDs.csv')
+student_key
+```
+
+Students may drop the class at any point. We want to take this into account every time we update the grades for individuals and as a class. The `merge_sheets` function on line 87 in the `app.R` script takes care of this by comparing the students in the `studentIDs.csv` and the students who still exist in the updated csv from BruinLearn.
+
+That is why it is so important to ensure the `Student` in `studentIDs.csv` matches the `Student` in the BruinLearn csv with grades in terms of format and content. Otherwise, it may accidentally omit students.
+
+This way, you do not have to check who dropped and manually delete rows in the `studentIDs.csv`.
+
+## Data wrangling part
+
+Now, all the preparation of the csv has been completed.
+
+Open up your BruinLearn csv, and inspect the dataset. There are usually 5 columns of students' meta-data in the beginning, starting from `Student` to `Section`, which will need to be removed.
+
+An important step is to transform the data from a wide format to a long format.
+
+-   Wide format: your BruinLearn csv has fewer rows than columns such that each row corresponds to one student, and each column corresponds to one quiz item and its score, and one student is associated with multiple scores, so multiple columns.
+
+-   Long format: we need the dataset to have one unique score corresponding to one entry of the student and one particular quiz item. As a result, the dataset will have more rows than columns. So each student is now associated with multiple rows, with only one column of a quiz item, and another column of the quiz score.
+
+You should rearrange the dataset by selecting between the 1st column of the grades data after removing the meta data and the last column before the 'key'.
+
+```{r, eval=F}
+
+# With this template I provided, there are only 2 columns to remove: -c(1,2) because I already removed the student contacts and IDs.
+data.long <- gather(data[-c(1:2)],item,score,colnames(data)[3]:colnames(data)[153],factor_key=T)
+
+# You should inspect the column names, use:
+colnames(data)
+
+# You should see five columns of meta-data to be removed: -c(1:5)
+# You should select from the first quiz or assignment item which should start at [6] (the 1st col after the meta-data),
+# to the column right before the 'key' column (which is also the second-to-last column) to select all the grade items:
+# colnames(data)[6]:colnames(data)[`second-to-last column index`]
+
+# Use the following line, and Replace `second-to-last column index` with a real number based on your data:
+data.long <- gather(data[-c(1:5)],item,score,colnames(data)[6]:colnames(data)[`second-to-last column index`],factor_key=T)
+```
+
+You only need to change all these for once, usually the first time using this script. Once you have set it up correctly, what is left is only updating the BruinLearn csv with grades weekly, and change the FILENAME on line 33 in `app.R`. Then, you can go straightly into `Run App`.
+
+## APP part
+
+Compare to the data preparation parts, this part is fairly light on what you will need to do.
+
+The only thing that needs to be changed is `choices` in `selectInput()` in Shiny. You want to modify it to make them exactly the same as the skills in your modified `skills.csv` for your course.
+
+``` r
+  selectInput(# Create the choices that can be selected.
+              choices = c("1.1.DefineSymbol"="1.1.",
+                          "1.2.GiveSymbol"="1.2.",
+                          "2.1.TranscribeMulti"="2.1.",
+                          "2.2.TranscribeC"="2.2.",
+                          "2.3.TranscribeV"="2.3.",
+                          "2.4.TranscribeTone"="2.4.",
+                          "2.5.TranscribeKnown"="2.5.",
+                          "3.1.ReadVocalTract"="3.1.",
+                          "3.2.GesturalScore"="3.2.",
+                          "4.1.SegmentSpectro"="4.1.",
+                          "4.2.ReadSpectro"="4.2.",
+                          "4.3.IdentifyDisplay"="4.3.",
+                          "4.4.ReadFrequency"="4.4.",
+                          "4.5.HarmonicsFormants"="4.5.",
+                          "5.Apply"="5."),
+              selected = "NA", # from the set of choice values
+              
+  )
+```
+
+You need to follow this structure:
+
+``` r
+c("Skill1" = "SkillNumber1",
+  "Skill2" = "SkillNumber2",
+  "Skill3" = "SkillNumber3",
+     ...
+)
+```
+
+Again, pay attention to the final **.** at the end of each skill number.
+
+You may want to modify the following instructions to your need, for example, show students how to use it, change any of the aesthetics (if you also change the points' styles and colors in `ggplot`), and change to a new date each time the grades are up-to-date.
+
+``` r
+p("Your grade is highlighted in", span("purple",style='color:magenta'), 
+    "dots with scores in", span("blue text",style='color:blue'), "overlaid.",
+    br(),
+    "The", span("gray",style='color:gray'), "dots are distributions of the grades as a class.", br(),
+    "The star indicates the required # of times towards mastery of a skill."),
+  br(),
+  p("Grades up to date 3/16/2022") # may want to change dates every time updating####
+```
+
+Some final words inside the `server()` function.
+
+In the template, I happen to filter out one student whose key was 'goral'. You should delete anything with this `%>%filter(key!='goral')` or `key!='goral'` in typical cases. But if you run into a similar scenario that you do not want to display someone's grade because maybe they have decided to drop the class but still appears in the roster on BruinLearn, etc., you can use this filtering as I did.
+
+``` r
+    ggplot(df%>%filter(key!='goral'), aes(y = skill,x=num)) +
+      # always displaying the # of times of mastery of all skills as stars
+      geom_point(fill = "slateblue",
+                 colour = "slateblue",size=6,shape=8, # stipulating color, size, shape of the points
+                 aes(y=skill,x=highlight))+
+      # displaying everyone's grade in this class of all skills as grey dots
+      geom_point(fill = "grey",
+                 data = df%>%filter(key!='goral'),
+                 colour = "grey",size=3)+
+      # displaying the grades of a particular student searched by key as plum dots
+      geom_point(fill = "plum2",
+                 data = df%>%filter(`key` == input$id,skillnum%in%input$skills),
+                 colour = "plum2",size=8)+
+      geom_text(data = df%>%filter(`key` == input$id,skillnum%in%input$skills),
+                 aes(label=percentage),size=6,color='navy',fontface='bold')+
+     # you can choose to display exact grades or percentage by changing "label=X"
+     # for example, you can display exact grades using "label=num"
+      labs(x='# Times demonstrated')+plotstyle
+```
+
+In the current design, I chose to display individual student's score for one skill at a time upon selection of the particular skill. Alternatively, if you prefer having all skills displayed all at once, you can remove the `skillnum%in%input$skills` argument inside the `filter()` function.
+
+Compare this to the previous chunk:
+
+```{r, eval=F}
+      # displaying the grades of a particular student searched by key as plum dots
+      geom_point(fill = "plum2",
+                 data = df%>%filter(`key` == input$id),
+                 colour = "plum2",size=8)+
+      geom_text(data = df%>%filter(`key` == input$id),
+                 aes(label=percentage),size=6,color='navy',fontface='bold')+
+```
+
+You may also want to change aesthetics if you are familiar with `ggplot2`:
+
+``` r
+    plotstyle = list(
+      theme_light(base_size=24),
+      theme(panel.border = element_rect(color = 'black',fill=NA),
+            axis.title.y = element_blank(),
+            axis.text.y = element_text(size = 20),
+            axis.title.x = element_text(size=24))
+    )
+```
+
+## Debug
+
+You do not need to run any code after making all the necessary modifications. If you really want, I recommend testing the codes in the Console, DO NOT add any other lines in the `app.R`, unless specified in this instruction.
+
+When you have made all the changes strictly following this instruction, you only need to click `Run App` on the top right corner. However, if it throws an error, you now need to go back to the very beginning, and start debugging.
+
+First, set up your working directory where this script and your csv files live. You can do this in the Console, or include that on line 25.
+
+```{r}
+#| eval: false
+setwd('Enter your working directory here')
+```
+
+Then, run each line, one at a time, do not skip lines, or jump back and forth. Otherwise, you have to start from the beginning.
+
+Errors should be self-explanatory. It is usually a name mismatch, inconsistency problem, or typo, e.g., unaligned parentheses, etc.
+
+## Deployment
+
+#### For first-time connections:
+
+Before you want to publish the completed app, you want to log in to [ShinyApps.io](https://ShinyApps.io).
+
+::: callout-note
+The p-lab has a paid account:
+
+email: *plab.ucla\@gmail.com*
+
+pwd: *Skillgrading2023*
+:::
+
+Once logging in, on the side menu on the left, click on *Account -\> Tokens*, click on *Add Token*.
+
+A new token will be added **on the bottom of any existing tokens**. Any existing tokens are already of use by other apps and other users, so ONLY use the one you just added.
+
+Click on *Show* next to the token you created.
+
+It will pop up a small new window with codes and text.
+
+Do not close this window or the webpage.
+
+Now go back to RStudio.
+
+Go to the topbar menu, find *File -\> Publish...*
+
+On the pop-up window, it will ask you to *Connect Account*. Click on *Next*. You should select the first option: *ShinyApps.io*.
+
+Then you should see a window like this:
+
+![](images/Screen%20Shot%202023-06-06%20at%205.39.32%20PM.png){width="1000"}
+
+Follow the instructions on the window, and go back to the ShinyApps.io webpage you opened, click *Show Secret* on that small pop-up window, and *Copy to Clipboard*.
+
+Go back to RStudio, and paste into the blank on this window shown in the picture.
+
+Click *Connect Account*.
+
+You should then see a window like this one:
+
+![](images/Screen%20Shot%202023-06-08%20at%204.49.51%20PM.png){width="1000"}
+
+You can change the Title and check the Files you want to include to Publish the app.
+
+#### If not the first-time use, e.g., future uses:
+
+When you update the app and re-launch it, you will see a slightly different window:
+
+![](images/Screen%20Shot%202023-06-08%20at%204.52.54%20PM.png){width="1000"}
+
+In any case, now you can click **Publish**.
+
+Wait for the notification that the app has been published. It will also open up your default browser to show what the app looks like.
+
+Yay! you are all done!
+
+You can see my examples here:
+
+> `demo (this template)`: <https://plabucla.shinyapps.io/demo/>
+>
+> `103 grading (used in Winter 2023)`: <https://plabucla.shinyapps.io/103skillgrading/>
+
+## A final step to show it to your students
+
+Open up the [ShinyApps.io](https://ShinyApps.io) and log in.
+
+On the side menu on the left, click on *Applications -\> Running*.
+
+You should see your app appear there, find it by the Title you named upon publishing.
+
+![](images/Screen%20Shot%202023-06-08%20at%204.55.44%20PM.png){width="1000"}
+
+Click on the Name of your app (e.g., 103skillgrading) and it will direct to this page:
+
+![](images/Screen%20Shot%202023-06-06%20at%206.01.07%20PM.png)
+
+On this page, you may click the URL, to ensure that it's working. And copy it and save it somewhere in your notes.
+
+This will be the URL that you give your students.
+
+The app is self-explanatory, and students will be able to use it once they have the URL. You could explain this app in class with the syllabus if you want.
+
+**Now, you are finally done.**

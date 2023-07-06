@@ -1,0 +1,16 @@
+﻿skill,times
+1.1.DefineSymbol,15
+1.2.GiveSymbol,10
+2.1.TranscribeMulti,25
+2.2.TranscribeC,10
+2.3.TranscribeV,5
+2.4.TranscribeTone,5
+2.5.TranscribeKnown,30
+3.1.ReadVocalTract,5
+3.2.GesturalScore,5
+4.1.SegmentSpectro,7
+4.2.ReadSpectro,7
+4.3.IdentifyDisplay,2
+4.4.ReadFrequency,2
+4.5.HarmonicsFormants,2
+5.Apply,5
